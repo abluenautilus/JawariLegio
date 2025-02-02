@@ -24,7 +24,6 @@ float max_signal = 1.0;
 Note notes[NUM_STRINGS];
 int current_note, last_current_note = -1;
 int semitone, prev_semitone = 0;
-int notes_orig_midinum[NUM_STRINGS];
 int notes_offset[NUM_STRINGS];
 const int base_semitone_offset = 24;
 
@@ -222,20 +221,20 @@ int main(void) {
     hw.ProcessAllControls(); 
 
     // Default tuning
-    notes[0].setNote("D",2);
-    notes[1].setNote("A",3);
-    notes[2].setNote("A",3);
-    notes[3].setNote("A",2);
+    notes[0].setNote("G",2);
+    notes[1].setNote("C",3);
+    notes[2].setNote("C",3);
+    notes[3].setNote("C",2);
 
-    notes_orig_midinum[0] = 38;
-    notes_orig_midinum[1] = 57;
-    notes_orig_midinum[2] = 57;
-    notes_orig_midinum[3] = 45;
+    // 43
+    // 48
+    // 48
+    // 36
 
-    notes_offset[0] = 0;
-    notes_offset[1] = 19;
-    notes_offset[2] = 19;
-    notes_offset[3] = 7;
+    notes_offset[0] = 7;
+    notes_offset[1] = 12;
+    notes_offset[2] = 12;
+    notes_offset[3] = 0;
 
     hw.seed.PrintLine("Clearing buffers....");
     // Clear buffers
