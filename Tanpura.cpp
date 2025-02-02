@@ -93,7 +93,7 @@ void doStep() {
     current_note = current_note + 1;
     if (current_note >= NUM_STRINGS) {
         current_note = 0;
-=    };
+    };
     string_trig[current_note] = 1.0f;
 
     //hw.seed.PrintLine("Doing step %d note: %s%d midi %d freq %.2f",current_note,notes[current_note].noteName.c_str(),notes[current_note].octave,notes[current_note].noteNumMIDI,notes[current_note].frequency);
@@ -180,6 +180,7 @@ int main(void) {
     hw.StartAdc();
 
     sampleRate = hw.AudioSampleRate();
+
 
     //Indicate version by blinking lights
     for (int i=0; i < version_small; ++i) {
@@ -302,6 +303,7 @@ int main(void) {
         } else if (hw.sw[DaisyLegio::SW_RIGHT].Read() == hw.sw->POS_RIGHT) {
             formant_on = true;
         } 
+
 
         for (int i = 0; i < NUM_STRINGS; ++i) {
             strings[i].SetFreq(notes[i].frequency * tuningOffset);
