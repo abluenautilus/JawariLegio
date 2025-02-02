@@ -93,14 +93,12 @@ void doStep() {
     current_note = current_note + 1;
     if (current_note >= NUM_STRINGS) {
         current_note = 0;
-        hw.seed.PrintLine("Looping.");
-    };
+=    };
     string_trig[current_note] = 1.0f;
 
-    hw.seed.PrintLine("Doing step %d note: %s%d midi %d freq %.2f",current_note,notes[current_note].noteName.c_str(),notes[current_note].octave,notes[current_note].noteNumMIDI,notes[current_note].frequency);
+    //hw.seed.PrintLine("Doing step %d note: %s%d midi %d freq %.2f",current_note,notes[current_note].noteName.c_str(),notes[current_note].octave,notes[current_note].noteNumMIDI,notes[current_note].frequency);
 
     formant_filters[current_note].Reset();
-    hw.seed.PrintLine("end step %d",current_note);
 
 };
 
@@ -183,12 +181,8 @@ int main(void) {
 
     sampleRate = hw.AudioSampleRate();
 
-    hw.seed.PrintLine("Logging enabled. Sample rate is %.2f",sampleRate);
-
     //Indicate version by blinking lights
-    hw.seed.PrintLine("VERSION %d . %d",version_large,version_small);
     for (int i=0; i < version_small; ++i) {
-        hw.seed.PrintLine("Blink %d",i);
         hw.SetLed(0,0,1,0);
         hw.SetLed(1,0,1,0);
         hw.UpdateLeds();
@@ -226,20 +220,13 @@ int main(void) {
     notes[2].setNote("C",3);
     notes[3].setNote("C",2);
 
-    // 43
-    // 48
-    // 48
-    // 36
-
     notes_offset[0] = 7;
     notes_offset[1] = 12;
     notes_offset[2] = 12;
     notes_offset[3] = 0;
 
-    hw.seed.PrintLine("Clearing buffers....");
     // Clear buffers
     for (int n = 0; n < NUM_STRINGS; ++n) {
-        hw.seed.PrintLine("Clearing buffer for string %d",n);
         for (int s = 0; s < string_npt; s++) {
             string_buffer[n][s] = 0;
         }
@@ -278,7 +265,6 @@ int main(void) {
         float volts = (control_pitch - calib_base)/calib_units_per_volt;
         semitone = round(volts * 12);
         if (semitone != prev_semitone) {
-            hw.seed.PrintLine("Semitone changed from %d to %d",prev_semitone,semitone);
             for (int i = 0; i < NUM_STRINGS; ++i) {
                 notes[i].noteNumMIDI = base_semitone_offset + semitone + notes_offset[i];
                 notes[i].noteName = notes[i].getNoteNameFromNum((notes[i].noteNumMIDI % 12) + 1);
