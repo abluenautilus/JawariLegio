@@ -2,7 +2,7 @@
 
 #define NUM_FILTERS 4
 
-// We keep interpolated filter coefficients in SDRAMq1  
+// We keep interpolated filter coefficients in SDRAM 
 float DSY_SDRAM_BSS fc_interp_[5][192000];
 float DSY_SDRAM_BSS bw_interp_[5][192000];
 float DSY_SDRAM_BSS gain_interp_[5][192000];
