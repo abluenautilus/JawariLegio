@@ -26,6 +26,7 @@ int current_note, last_current_note = -1;
 int semitone, prev_semitone = 0;
 int notes_offset[NUM_STRINGS];
 const int base_semitone_offset = 24;
+int note_dial, note_dial_prev;
 
 // Default calibration values
 const float calib_base = 0.331;
@@ -59,7 +60,6 @@ float formant_mix = 0.3;
 float now,then = 0;
 
 //low pass filter
-bool lpf_on = false;
 Svf lpf;
 
 bool triggerState, prevTriggerState = false;
@@ -69,6 +69,8 @@ float stepR,stepG,stepB;
 // Persistence
 struct Settings {
     float tuningOffset;
+    int firstNoteOffset;
+    float tuningFactor;
     bool operator!=(const Settings& a) {
         return a.tuningOffset != tuningOffset;
     }
@@ -80,12 +82,16 @@ PersistentStorage<Settings> storage(hw.seed.qspi);
 void saveData() {
     Settings &localSettings = storage.GetSettings();
     localSettings.tuningOffset = tuningOffset;
+    localSettings.firstNoteOffset = notes_offset[0];
+    localSettings.tuningFactor = tuningFactor;
     storage.Save();
 }
 
 void loadData() {
     Settings &localSettings = storage.GetSettings();
     tuningOffset = localSettings.tuningOffset;
+    notes_offset[0] = localSettings.tuningOffset;
+    tuningFactor = localSettings.tuningFactor;
 }
 
 void doStep() {
@@ -95,8 +101,6 @@ void doStep() {
         current_note = 0;
     };
     string_trig[current_note] = 1.0f;
-
-    //hw.seed.PrintLine("Doing step %d note: %s%d midi %d freq %.2f",current_note,notes[current_note].noteName.c_str(),notes[current_note].octave,notes[current_note].noteNumMIDI,notes[current_note].frequency);
 
     formant_filters[current_note].Reset();
 
@@ -153,13 +157,9 @@ static void AudioCallback(AudioHandle::InputBuffer  in,
         };
 
         float sig_l, sig_r;
-
-        if (lpf_on) {
-            lpf.Process(currentVoltage);
-            sig_l = sig_r = lpf.Low();
-        } else {
-            sig_l = sig_r = currentVoltage;
-        }
+    
+        lpf.Process(currentVoltage);
+        sig_l = sig_r = lpf.Low();
 
         OUT_L[c] = sig_l; 
         OUT_R[c] = sig_r;
@@ -196,8 +196,11 @@ int main(void) {
     }
 
     //Set up and load persistent settings
+
     Settings defaults;
     defaults.tuningOffset = 0.0;
+    defaults.firstNoteOffset = 7;
+    defaults.tuningFactor = 0.0;
     storage.Init(defaults);
     loadData();
 
@@ -278,13 +281,12 @@ int main(void) {
         //change knob from 0-1 to -1 to 1 and raise 2 to that power to get factor
         float encInc = hw.encoder.Increment();
         tuningFactor += hw.encoder.Pressed() ? encInc / 12 : (encInc / 12) * 0.05;
-        tuningOffsetPrev = tuningOffset;
-        tuningOffset = pow(2,tuningFactor);
+        if (encInc) {
+            tuningOffsetPrev = tuningOffset;
+            tuningOffset = pow(2,tuningFactor);
 
-        if (tuningOffset != tuningOffsetPrev) {saveData();}
-
-        float freq = hw.GetKnobValue(DaisyLegio::CONTROL_KNOB_BOTTOM) * 4000;
-        lpf.SetFreq(freq);
+            if (tuningOffset != tuningOffsetPrev) {saveData();}
+        }
 
         jawari = hw.GetKnobValue(DaisyLegio::CONTROL_KNOB_TOP);
 
@@ -293,9 +295,24 @@ int main(void) {
         string_mix = 1 - (comb_mix);
 
         if (hw.sw[DaisyLegio::SW_LEFT].Read() == hw.sw->POS_LEFT) {
-            lpf_on = false;
+            //Set semitone of first string
+            note_dial_prev = note_dial;
+            note_dial = floor(hw.GetKnobValue(DaisyLegio::CONTROL_KNOB_BOTTOM) * 12);
+            if (note_dial != note_dial_prev) {
+                notes_offset[0] = note_dial;
+                notes[0].noteNumMIDI = base_semitone_offset + semitone + notes_offset[0] + 12;
+                notes[0].noteName = notes[0].getNoteNameFromNum((notes[0].noteNumMIDI % 12) + 1);
+
+                notes[0].setFreq();
+                strings[0].SetFreq(notes[0].frequency * tuningOffset);
+                combs[0].SetFreq(notes[0].frequency * tuningOffset);
+                saveData();
+            }
+
         } else if (hw.sw[DaisyLegio::SW_LEFT].Read() == hw.sw->POS_RIGHT) {
-            lpf_on = true;
+            //Set filter cutoff
+            float freq = hw.GetKnobValue(DaisyLegio::CONTROL_KNOB_BOTTOM) * 4000;
+            lpf.SetFreq(freq);
         } 
 
         if (hw.sw[DaisyLegio::SW_RIGHT].Read() == hw.sw->POS_LEFT) {
