@@ -16,6 +16,9 @@ int version_small = 1;
 // Patch.Init hardware objects
 DaisyLegio hw;
 Switch button, toggle;
+Limiter limiter;
+
+GPIO calibrationReference;
 
 float sampleRate;
 float max_signal = 1.0;
@@ -29,8 +32,8 @@ const int base_semitone_offset = 24;
 int note_dial, note_dial_prev;
 
 // Default calibration values
-const float calib_base = 0.331;
-const float calib_units_per_volt = 0.12573;
+float calibration_offset = 0.69;
+float calibration_coef = -7.65;
 
 // Main strings (K-S Pluck)
 Pluck strings[NUM_STRINGS];
@@ -45,24 +48,23 @@ float jawari, prevJawari = 0.0f;
 
 //Comb filters
 Comb combs[NUM_STRINGS];
-float comb_buffer[NUM_STRINGS][1500];
-int comb_npt = 1500;
+float comb_buffer[NUM_STRINGS][15000];
+int comb_npt = 15000;
 
 //Formant Filters
 FormantFilter formant_filters[NUM_FILTERS];
-bool clockState, prevClockState, formant_on;
+bool clockState, prevClockState;
 float formant_duration = 2.0;
 
 //Mixing
 float string_mix = 0.3;
 float comb_mix= 0.2;
 float formant_mix = 0.3;
+float formant_mix_amount = 0.5;
 float now,then = 0;
 
 //low pass filter
 Svf lpf;
-
-bool triggerState, prevTriggerState = false;
 
 float stepR,stepG,stepB;
 
@@ -74,16 +76,21 @@ struct Settings {
     bool operator!=(const Settings& a) {
         return a.tuningOffset != tuningOffset;
     }
+    float calibration_offset;
+    float calibration_coef;
 };
 
 Settings& operator* (const Settings& settings) { return *settings; }
 PersistentStorage<Settings> storage(hw.seed.qspi);
+
 
 void saveData() {
     Settings &localSettings = storage.GetSettings();
     localSettings.tuningOffset = tuningOffset;
     localSettings.firstNoteOffset = notes_offset[0];
     localSettings.tuningFactor = tuningFactor;
+    localSettings.calibration_coef = calibration_coef;
+    localSettings.calibration_offset = calibration_offset;
     storage.Save();
 }
 
@@ -92,7 +99,42 @@ void loadData() {
     tuningOffset = localSettings.tuningOffset;
     notes_offset[0] = localSettings.tuningOffset;
     tuningFactor = localSettings.tuningFactor;
+    calibration_coef = localSettings.calibration_coef;
+    calibration_offset = localSettings.calibration_offset;
+    hw.seed.PrintLine("Loaded tuningFactor: %.2f Offset: %d",tuningFactor,notes_offset[0]);
 }
+
+void AutoCalibrate() {
+    hw.seed.PrintLine("Autocalibrating...");
+    float lowVal = 0.0;
+    float highVal = 0.0;
+    float epsilon = 0.01;
+    calibrationReference.Write(true);
+    for(int i=0; i<100; i++) {
+        System::Delay(1);
+        lowVal += hw.controls[DaisyLegio::CONTROL_PITCH].GetRawFloat();
+        hw.seed.PrintLine("%s: " FLT_FMT(6), "LOWVAL:   ", FLT_VAR(6, hw.controls[DaisyLegio::CONTROL_PITCH].GetRawFloat()));
+    }
+    lowVal /= 100.0;
+
+    calibrationReference.Write(false);
+    for(int i=0; i<100; i++) {
+        System::Delay(1);
+        highVal += hw.controls[DaisyLegio::CONTROL_PITCH].GetRawFloat();
+        hw.seed.PrintLine("%s: " FLT_FMT(6), "HIGHVAL:  ", FLT_VAR(6, hw.controls[DaisyLegio::CONTROL_PITCH].GetRawFloat()));
+    }
+    highVal /= 100.0;
+
+    calibrationReference.Write(true);
+
+    if(abs(lowVal - highVal) < epsilon) return; // error, something is plugged in
+
+    calibration_coef = 2.5 / (highVal - lowVal);
+    calibration_offset = lowVal;
+    hw.seed.PrintLine("Highval %.2f Lowval %.2f Coef %.2f Offset %.2f",highVal,lowVal,calibration_coef,calibration_offset);
+    saveData();
+}
+
 
 void doStep() {
 
@@ -145,16 +187,12 @@ static void AudioCallback(AudioHandle::InputBuffer  in,
             float combVoltage = combs[i].Process(stringVoltage);
             float combWeighted = combVoltage * string_weight;
             float formantWeighted;
-            if (formant_on) {
-                formantWeighted = formant_filters[i].Process(stringVoltage) * string_weight;
-            } else {
-                formantWeighted = 0;
-            }
-
+            formantWeighted = formant_filters[i].Process(stringVoltage) * string_weight;
             float mix = (stringWeighted * string_mix) + (combWeighted * comb_mix) + (formantWeighted * formant_mix * 20);
-
             currentVoltage += mix;
         };
+
+        limiter.ProcessBlock(&currentVoltage,1,1);
 
         float sig_l, sig_r;
     
@@ -169,9 +207,15 @@ static void AudioCallback(AudioHandle::InputBuffer  in,
     
 };
 
+float GetVoctValue() {
+
+    float raw = hw.controls[DaisyLegio::CONTROL_PITCH].GetRawFloat();
+    float normalized = (raw - calibration_offset) * calibration_coef;
+    return normalized;
+}
+
 
 int main(void) {
-
 
     // Initialize patch sm hardware and start audio, ADC
     hw.Init(true);
@@ -179,8 +223,13 @@ int main(void) {
     hw.seed.StartLog(false);
     hw.StartAdc();
 
+    Pin configPin = daisy::seed::D20;
+    calibrationReference.Init(configPin,GPIO::Mode::OUTPUT, GPIO::Pull::NOPULL);
+    
+    AutoCalibrate();
+    
     sampleRate = hw.AudioSampleRate();
-
+    limiter.Init();
 
     //Indicate version by blinking lights
     for (int i=0; i < version_small; ++i) {
@@ -196,7 +245,6 @@ int main(void) {
     }
 
     //Set up and load persistent settings
-
     Settings defaults;
     defaults.tuningOffset = 0.0;
     defaults.firstNoteOffset = 7;
@@ -248,7 +296,6 @@ int main(void) {
         combs[i].Init(sampleRate,comb_buffer[i],comb_npt);
         combs[i].SetFreq(notes[i].frequency);
 
-    
     };
     for (int i = 0; i < NUM_FILTERS; ++i) {
         formant_filters[i].Init(sampleRate,2,3);
@@ -265,10 +312,11 @@ int main(void) {
 
         //process pitch
         prev_semitone = semitone;
-        float control_pitch = hw.controls[DaisyLegio::CONTROL_PITCH].Value();
-        float volts = (control_pitch - calib_base)/calib_units_per_volt;
+        float volts = GetVoctValue();
+
         semitone = round(volts * 12);
         if (semitone != prev_semitone) {
+            hw.seed.PrintLine("Resetting semitone to %d",semitone);
             for (int i = 0; i < NUM_STRINGS; ++i) {
                 notes[i].noteNumMIDI = base_semitone_offset + semitone + notes_offset[i];
                 notes[i].noteName = notes[i].getNoteNameFromNum((notes[i].noteNumMIDI % 12) + 1);
@@ -284,14 +332,16 @@ int main(void) {
         if (encInc) {
             tuningOffsetPrev = tuningOffset;
             tuningOffset = pow(2,tuningFactor);
-
-            if (tuningOffset != tuningOffsetPrev) {saveData();}
+            if (tuningOffset != tuningOffsetPrev) {
+                saveData();
+            }
         }
 
         jawari = hw.GetKnobValue(DaisyLegio::CONTROL_KNOB_TOP);
 
+        // Effects mixing values
         comb_mix = jawari * 0.4;
-        formant_mix = jawari * 0.4;
+        formant_mix = jawari * formant_mix_amount;
         string_mix = 1 - (comb_mix);
 
         if (hw.sw[DaisyLegio::SW_LEFT].Read() == hw.sw->POS_LEFT) {
@@ -313,13 +363,18 @@ int main(void) {
             //Set filter cutoff
             float freq = hw.GetKnobValue(DaisyLegio::CONTROL_KNOB_BOTTOM) * 4000;
             lpf.SetFreq(freq);
-        } 
+        }  else if (hw.sw[DaisyLegio::SW_LEFT].Read() == hw.sw->POS_CENTER) {
+            hw.seed.PrintLine("Switch in center");
+        }
 
         if (hw.sw[DaisyLegio::SW_RIGHT].Read() == hw.sw->POS_LEFT) {
-            formant_on = false;
+            formant_mix_amount = 0.1;
+            
         } else if (hw.sw[DaisyLegio::SW_RIGHT].Read() == hw.sw->POS_RIGHT) {
-            formant_on = true;
-        } 
+            formant_mix_amount = 1.0;
+        } else if (hw.sw[DaisyLegio::SW_RIGHT].Read() == hw.sw->POS_CENTER) {
+            formant_mix_amount = 0.5;
+        }
 
 
         for (int i = 0; i < NUM_STRINGS; ++i) {
@@ -327,12 +382,9 @@ int main(void) {
             combs[i].SetFreq(notes[i].frequency * tuningOffset);
         }
 
-        //check for trigger in
-        triggerState = hw.Gate();
-        if (triggerState && !prevTriggerState) {
+        if (hw.gate.Trig()) {
             doStep();
         }
-        prevTriggerState = triggerState;
 
         // Set leds
         stepR = jawari/2;
