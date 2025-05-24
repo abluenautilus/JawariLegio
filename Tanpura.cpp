@@ -1,3 +1,13 @@
+/* Tanpura Legio
+
+Port of Seaside Modular Jawari to Noise Engineering Legio
+By @abluenautilus 2025
+
+Special thanks to @efairbanks for the auto-calibration code
+
+*/
+
+
 #include "daisy_legio.h"
 #include "daisysp.h"
 #include "Note.hpp"
