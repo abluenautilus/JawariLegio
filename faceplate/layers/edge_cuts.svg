@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="edge_cuts" xmlns="http://www.w3.org/2000/svg" width="30.48mm" height="128.5mm" viewBox="0 0 86.4 364.25">
+  <defs>
+    <style>
+      .cls-1 {
+        stroke: #231f20;
+      }
+
+      .cls-1, .cls-2 {
+        fill: none;
+        stroke-miterlimit: 10;
+        stroke-width: 0px;
+      }
+
+      .cls-2 {
+        stroke: #00a651;
+      }
+    </style>
+  </defs>
+  <rect class="cls-1" width="86.4" height="364.25"/>
+  <g id="Layer_2" data-name="Layer 2">
+    <circle class="cls-2" cx="44.44" cy="54.18" r="10.35"/>
+    <circle class="cls-2" cx="44.44" cy="105.46" r="12.88"/>
+  </g>
+  <circle class="cls-2" cx="44.44" cy="163.08" r="12.88"/>
+  <circle class="cls-2" cx="44.47" cy="214.9" r="9.57"/>
+  <circle class="cls-2" cx="44.54" cy="256" r="9.57"/>
+  <circle class="cls-2" cx="15.29" cy="235.06" r="9.57"/>
+  <circle class="cls-2" cx="71.11" cy="235.06" r="9.57"/>
+  <circle class="cls-2" cx="15.29" cy="278.23" r="9.57"/>
+  <circle class="cls-2" cx="15.29" cy="317.74" r="9.57"/>
+  <circle class="cls-2" cx="71.11" cy="278.23" r="9.57"/>
+  <circle class="cls-2" cx="71.11" cy="317.74" r="9.57"/>
+  <circle class="cls-2" cx="12.09" cy="184.72" r="7.2"/>
+  <circle class="cls-2" cx="76.9" cy="184.67" r="7.2"/>
+  <circle class="cls-2" cx="12.11" cy="40.69" r="4.21"/>
+  <circle class="cls-2" cx="76.93" cy="40.71" r="4.21"/>
+  <rect class="cls-2" x="13.14" y="3.79" width="18.25" height="9.08" rx="3.19" ry="3.19"/>
+  <rect class="cls-2" x="56.3" y="3.79" width="18.25" height="9.08" rx="3.19" ry="3.19"/>
+  <rect class="cls-2" x="13.23" y="351.05" width="18.25" height="9.08" rx="3.19" ry="3.19"/>
+  <rect class="cls-2" x="56.53" y="350.99" width="18.25" height="9.08" rx="3.19" ry="3.19"/>
+</svg>
